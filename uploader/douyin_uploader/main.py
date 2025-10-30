@@ -114,8 +114,8 @@ class DouYinVideo(object):
         # 等待页面跳转到指定的 URL，没进入，则自动等待到超时
         douyin_logger.info(f'[-] 正在打开主页...')
         await page.wait_for_url("https://creator.douyin.com/creator-micro/content/upload")
-        # 点击 "上传视频" 按钮
-        await page.locator("div[class^='container'] input").set_input_files(self.file_path)
+        # 点击 "上传视频" 按钮 - 使用更精确的定位器
+        await page.locator("div[class^='container'] input[type='file']").first.set_input_files(self.file_path)
 
         # 等待页面跳转到指定的 URL 2025.01.08修改在原有基础上兼容两种页面
         while True:

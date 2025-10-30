@@ -163,22 +163,87 @@ class XiaoHongShuVideo(object):
         # 这里为了避免页面变化，故使用相对位置定位：作品标题父级右侧第一个元素的input子元素
         await asyncio.sleep(1)
         xiaohongshu_logger.info(f'  [-] 正在填充标题和话题...')
+        
+        # 方案1: 尝试新版UI - 填充标题输入框
         title_container = page.locator('div.plugin.title-container').locator('input.d-text')
         if await title_container.count():
             await title_container.fill(self.title[:30])
+            xiaohongshu_logger.info(f'  [-] 已填充标题（新版UI）')
+        
+        # 方案2: 尝试旧版UI - 使用 notranslate
         else:
             titlecontainer = page.locator(".notranslate")
-            await titlecontainer.click()
-            await page.keyboard.press("Backspace")
-            await page.keyboard.press("Control+KeyA")
-            await page.keyboard.press("Delete")
-            await page.keyboard.type(self.title)
-            await page.keyboard.press("Enter")
-        css_selector = ".ql-editor" # 不能加上 .ql-blank 属性，这样只能获取第一次非空状态
-        for index, tag in enumerate(self.tags, start=1):
-            await page.type(css_selector, "#" + tag)
-            await page.press(css_selector, "Space")
-        xiaohongshu_logger.info(f'总共添加{len(self.tags)}个话题')
+            if await titlecontainer.count():
+                await titlecontainer.click()
+                await page.keyboard.press("Backspace")
+                await page.keyboard.press("Control+KeyA")
+                await page.keyboard.press("Delete")
+                await page.keyboard.type(self.title)
+                await page.keyboard.press("Enter")
+                xiaohongshu_logger.info(f'  [-] 已填充标题（旧版UI）')
+        
+        # 填充正文内容（重要！这是必填项）
+        await asyncio.sleep(0.5)
+        
+        # 先尝试多个可能的选择器来找到正文编辑器
+        content_filled = False
+        content_selectors = [
+            ".ql-editor",  # 旧版编辑器
+            "div[data-placeholder]",  # 新版可能带 placeholder 的 div
+            "div.c-input[contenteditable='true']",  # contenteditable div
+            "div[contenteditable='true']",  # 任意 contenteditable
+            "textarea[placeholder*='输入']",  # textarea
+            ".publish-content-container textarea",  # 容器内的 textarea
+            ".publish-content-container div[contenteditable]",  # 容器内的 contenteditable
+        ]
+        
+        for css_selector in content_selectors:
+            try:
+                element_count = await page.locator(css_selector).count()
+                if element_count > 0:
+                    xiaohongshu_logger.info(f'  [-] 找到正文编辑器: {css_selector}')
+                    
+                    # 点击正文编辑器
+                    await page.locator(css_selector).first.click(timeout=5000)
+                    await asyncio.sleep(0.3)
+                    
+                    # 清空可能存在的内容
+                    await page.keyboard.press("Control+KeyA")
+                    await page.keyboard.press("Delete")
+                    
+                    # 输入标题作为正文
+                    await page.keyboard.type(self.title)
+                    await page.keyboard.press("Enter")
+                    xiaohongshu_logger.info(f'  [-] 已填充正文描述')
+                    
+                    # 添加话题标签
+                    await asyncio.sleep(0.3)
+                    for index, tag in enumerate(self.tags, start=1):
+                        await page.keyboard.type("#" + tag)
+                        await page.keyboard.press("Space")
+                    
+                    xiaohongshu_logger.info(f'  [-] 总共添加{len(self.tags)}个话题')
+                    content_filled = True
+                    break
+            except Exception as e:
+                xiaohongshu_logger.warning(f'  [-] 尝试选择器 {css_selector} 失败: {str(e)}')
+                continue
+        
+        if not content_filled:
+            xiaohongshu_logger.error(f'  [-] 所有选择器都无法定位正文编辑器，尝试通过Tab键导航')
+            # 最后的备用方案：从标题输入框按 Tab 键切换到正文
+            try:
+                await page.keyboard.press("Tab")
+                await asyncio.sleep(0.3)
+                await page.keyboard.type(self.title)
+                await page.keyboard.press("Enter")
+                await asyncio.sleep(0.3)
+                for index, tag in enumerate(self.tags, start=1):
+                    await page.keyboard.type("#" + tag)
+                    await page.keyboard.press("Space")
+                xiaohongshu_logger.success(f'  [-] 通过Tab键填充成功')
+            except Exception as e:
+                xiaohongshu_logger.error(f'  [-] Tab键方案也失败: {str(e)}')
 
         # while True:
         #     # 判断重新上传按钮是否存在，如果不存在，代表视频正在上传，则等待

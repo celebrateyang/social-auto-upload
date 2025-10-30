@@ -54,9 +54,17 @@
                     </el-tag>
                   </template>
                 </el-table-column>
-                <el-table-column label="操作">
+                <el-table-column label="操作" width="230">
                   <template #default="scope">
                     <el-button size="small" @click="handleEdit(scope.row)">编辑</el-button>
+                    <el-button 
+                      v-if="scope.row.status !== '正常'" 
+                      size="small" 
+                      type="warning" 
+                      @click="handleRelogin(scope.row)"
+                    >
+                      重新登录
+                    </el-button>
                     <el-button size="small" type="danger" @click="handleDelete(scope.row)">删除</el-button>
                   </template>
                 </el-table-column>
@@ -117,9 +125,17 @@
                     </el-tag>
                   </template>
                 </el-table-column>
-                <el-table-column label="操作">
+                <el-table-column label="操作" width="230">
                   <template #default="scope">
                     <el-button size="small" @click="handleEdit(scope.row)">编辑</el-button>
+                    <el-button 
+                      v-if="scope.row.status !== '正常'" 
+                      size="small" 
+                      type="warning" 
+                      @click="handleRelogin(scope.row)"
+                    >
+                      重新登录
+                    </el-button>
                     <el-button size="small" type="danger" @click="handleDelete(scope.row)">删除</el-button>
                   </template>
                 </el-table-column>
@@ -180,9 +196,17 @@
                     </el-tag>
                   </template>
                 </el-table-column>
-                <el-table-column label="操作">
+                <el-table-column label="操作" width="230">
                   <template #default="scope">
                     <el-button size="small" @click="handleEdit(scope.row)">编辑</el-button>
+                    <el-button 
+                      v-if="scope.row.status !== '正常'" 
+                      size="small" 
+                      type="warning" 
+                      @click="handleRelogin(scope.row)"
+                    >
+                      重新登录
+                    </el-button>
                     <el-button size="small" type="danger" @click="handleDelete(scope.row)">删除</el-button>
                   </template>
                 </el-table-column>
@@ -243,9 +267,17 @@
                     </el-tag>
                   </template>
                 </el-table-column>
-                <el-table-column label="操作">
+                <el-table-column label="操作" width="230">
                   <template #default="scope">
                     <el-button size="small" @click="handleEdit(scope.row)">编辑</el-button>
+                    <el-button 
+                      v-if="scope.row.status !== '正常'" 
+                      size="small" 
+                      type="warning" 
+                      @click="handleRelogin(scope.row)"
+                    >
+                      重新登录
+                    </el-button>
                     <el-button size="small" type="danger" @click="handleDelete(scope.row)">删除</el-button>
                   </template>
                 </el-table-column>
@@ -306,9 +338,17 @@
                     </el-tag>
                   </template>
                 </el-table-column>
-                <el-table-column label="操作">
+                <el-table-column label="操作" width="230">
                   <template #default="scope">
                     <el-button size="small" @click="handleEdit(scope.row)">编辑</el-button>
+                    <el-button 
+                      v-if="scope.row.status !== '正常'" 
+                      size="small" 
+                      type="warning" 
+                      @click="handleRelogin(scope.row)"
+                    >
+                      重新登录
+                    </el-button>
                     <el-button size="small" type="danger" @click="handleDelete(scope.row)">删除</el-button>
                   </template>
                 </el-table-column>
@@ -392,7 +432,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { Refresh, CircleCheckFilled, CircleCloseFilled } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { accountApi } from '@/api/account'
@@ -530,6 +570,42 @@ const handleEdit = (row) => {
   dialogType.value = 'edit'
   Object.assign(accountForm, { ...row })
   dialogVisible.value = true
+}
+
+// 重新登录
+const handleRelogin = (row) => {
+  ElMessageBox.confirm(
+    `账号 ${row.name} 的登录已失效，是否重新登录？`,
+    '重新登录',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning',
+    }
+  )
+    .then(() => {
+      // 触发登录流程
+      dialogType.value = 'add'
+      Object.assign(accountForm, {
+        id: row.id,
+        name: row.name,
+        platform: row.platform,
+        status: row.status
+      })
+      // 重置SSE状态
+      sseConnecting.value = false
+      qrCodeData.value = ''
+      loginStatus.value = ''
+      dialogVisible.value = true
+      
+      // 自动开始SSE连接
+      nextTick(() => {
+        startSSEConnection(row.platform, row.name)
+      })
+    })
+    .catch(() => {
+      // 取消操作
+    })
 }
 
 // 删除账号

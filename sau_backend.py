@@ -184,17 +184,42 @@ async def getValidAccounts():
         print("\n📋 当前数据表内容：")
         for row in rows:
             print(row)
+        
+        # 逐个验证账号，失败后继续验证其他账号
         for row in rows_list:
-            flag = await check_cookie(row[1],row[2])
-            if not flag:
+            try:
+                flag = await check_cookie(row[1], row[2])
+                if not flag:
+                    row[4] = 0
+                    cursor.execute('''
+                    UPDATE user_info 
+                    SET status = ? 
+                    WHERE id = ?
+                    ''', (0, row[0]))
+                    conn.commit()
+                    print(f"✅ 账号 {row[3]} 状态已更新为失效")
+                else:
+                    # 确保有效账号状态为1
+                    row[4] = 1
+                    cursor.execute('''
+                    UPDATE user_info 
+                    SET status = ? 
+                    WHERE id = ?
+                    ''', (1, row[0]))
+                    conn.commit()
+                    print(f"✅ 账号 {row[3]} 状态有效")
+            except Exception as e:
+                # 验证失败，标记为无效，但继续验证其他账号
+                print(f"❌ 账号 {row[3]} 验证失败: {str(e)}")
                 row[4] = 0
                 cursor.execute('''
                 UPDATE user_info 
                 SET status = ? 
                 WHERE id = ?
-                ''', (0,row[0]))
+                ''', (0, row[0]))
                 conn.commit()
-                print("✅ 用户状态已更新")
+                continue
+        
         for row in rows:
             print(row)
         return jsonify(
@@ -291,6 +316,63 @@ def delete_account():
         return jsonify({
             "code": 500,
             "msg": str("delete failed!"),
+            "data": None
+        }), 500
+
+
+# 重新登录接口 - 用于失效账号重新获取cookie
+@app.route('/relogin', methods=['POST'])
+def relogin():
+    """
+    重新登录接口，用于账号cookie失效后重新获取
+    参数：
+    - account_id: 账号ID
+    """
+    try:
+        data = request.get_json()
+        account_id = data.get('account_id')
+        
+        if not account_id:
+            return jsonify({
+                "code": 400,
+                "msg": "缺少account_id参数",
+                "data": None
+            }), 400
+        
+        # 查询账号信息
+        with sqlite3.connect(Path(BASE_DIR / "db" / "database.db")) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM user_info WHERE id = ?", (account_id,))
+            account = cursor.fetchone()
+            
+            if not account:
+                return jsonify({
+                    "code": 404,
+                    "msg": "账号不存在",
+                    "data": None
+                }), 404
+            
+            account_type = account[1]  # 平台类型
+            account_name = account[3]  # 账号名称
+            cookie_file = account[2]   # cookie文件名
+            
+            # 返回需要重新登录的信息
+            return jsonify({
+                "code": 200,
+                "msg": "请使用登录接口重新获取cookie",
+                "data": {
+                    "account_id": account_id,
+                    "account_type": account_type,
+                    "account_name": account_name,
+                    "cookie_file": cookie_file,
+                    "login_url": f"/login?type={account_type}&id={cookie_file.replace('.json', '')}"
+                }
+            }), 200
+            
+    except Exception as e:
+        return jsonify({
+            "code": 500,
+            "msg": f"重新登录失败: {str(e)}",
             "data": None
         }), 500
 

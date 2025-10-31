@@ -14,7 +14,7 @@
           </div>
 
           <!-- 视频上传区域 -->
-          <div class="upload-section">
+          <div class="upload-section section-border">
             <h3>视频</h3>
             <div class="upload-options">
               <el-button type="primary" @click="showUploadOptions" class="upload-btn">
@@ -122,7 +122,7 @@
           </el-dialog>
 
           <!-- 账号列表（按平台分组显示） -->
-          <div class="account-section">
+          <div class="account-section section-border">
             <h3>账号列表</h3>
             <div class="all-accounts-display">
               <template v-for="platform in [
@@ -158,7 +158,7 @@
           </div>
 
           <!-- 平台按钮组 -->
-          <div class="platform-section">
+          <div class="platform-section section-border">
             <h3>平台</h3>
             <div class="platform-buttons">
               <el-button
@@ -171,7 +171,6 @@
                 {{ platform.name }}
               </el-button>
             </div>
-          </div>
 
           <!-- 标题输入 -->
           <div class="title-section">
@@ -360,6 +359,7 @@
           <div class="action-buttons">
             <el-button size="small" @click="cancelPublish">取消</el-button>
             <el-button size="small" type="primary" @click="confirmPublish">发布</el-button>
+          </div>
           </div>
 
           <!-- 上传结果（可折叠） -->
@@ -978,6 +978,15 @@ onMounted(async () => {
     border-radius: 4px;
     box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
     padding: 20px;
+    
+    // 虚线框样式 - 移到外层
+    .section-border {
+      border: 2px dashed #409eff !important;
+      border-radius: 8px;
+      padding: 20px;
+      background-color: #f0f9ff;
+      margin-bottom: 30px;
+    }
     
     .tab-content-wrapper {
       display: flex;

@@ -133,9 +133,15 @@ class TencentVideo(object):
         file_input = page.locator('input[type="file"]')
         await file_input.set_input_files(self.file_path)
 
-    async def upload(self, playwright: Playwright) -> None:
+    async def upload(self, playwright: Playwright, browser=None) -> None:
+        # 判断是否需要关闭浏览器（在本函数内部决定）
+        should_close_browser = browser is None
+        
         # 使用 Chromium (这里使用系统内浏览器，用chromium 会造成h264错误
-        browser = await playwright.chromium.launch(headless=False, executable_path=self.local_executable_path)
+        if browser is None:
+            # 如果没有传入浏览器实例，则创建新的
+            browser = await playwright.chromium.launch(headless=False, executable_path=self.local_executable_path)
+        
         # 创建一个浏览器上下文，使用指定的 cookie 文件
         context = await browser.new_context(storage_state=f"{self.account_file}")
         context = await set_init_script(context)
@@ -172,7 +178,9 @@ class TencentVideo(object):
         await asyncio.sleep(2)  # 这里延迟是为了方便眼睛直观的观看
         # 关闭浏览器上下文和浏览器实例
         await context.close()
-        await browser.close()
+        # 只有自己创建的浏览器才关闭
+        if should_close_browser:
+            await browser.close()
 
     async def add_short_title(self, page):
         short_title_element = page.get_by_text("短标题", exact=True).locator("..").locator(

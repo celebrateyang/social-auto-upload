@@ -75,18 +75,25 @@ class KSVideo(object):
         kuaishou_logger.error("视频出错了，重新上传中")
         await page.locator('div.progress-div [class^="upload-btn-input"]').set_input_files(self.file_path)
 
-    async def upload(self, playwright: Playwright) -> None:
+    async def upload(self, playwright: Playwright, browser=None) -> None:
+        # 判断是否需要关闭浏览器（在本函数内部决定）
+        should_close_browser = browser is None
+        
         # 使用 Chromium 浏览器启动一个浏览器实例
         print(self.local_executable_path)
-        if self.local_executable_path:
-            browser = await playwright.chromium.launch(
-                headless=False,
-                executable_path=self.local_executable_path,
-            )
-        else:
-            browser = await playwright.chromium.launch(
-                headless=False
-            )  # 创建一个浏览器上下文，使用指定的 cookie 文件
+        if browser is None:
+            # 如果没有传入浏览器实例，则创建新的
+            if self.local_executable_path:
+                browser = await playwright.chromium.launch(
+                    headless=False,
+                    executable_path=self.local_executable_path,
+                )
+            else:
+                browser = await playwright.chromium.launch(
+                    headless=False
+                )
+        
+        # 创建一个浏览器上下文，使用指定的 cookie 文件
         context = await browser.new_context(storage_state=f"{self.account_file}")
         context = await set_init_script(context)
         # 创建一个新的页面
@@ -190,7 +197,9 @@ class KSVideo(object):
         await asyncio.sleep(2)  # 这里延迟是为了方便眼睛直观的观看
         # 关闭浏览器上下文和浏览器实例
         await context.close()
-        await browser.close()
+        # 只有自己创建的浏览器才关闭
+        if should_close_browser:
+            await browser.close()
 
     async def main(self):
         async with async_playwright() as playwright:

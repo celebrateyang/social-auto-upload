@@ -162,7 +162,7 @@
             <h3>平台</h3>
             <div class="platform-buttons">
               <el-button
-                v-for="platform in platforms"
+                v-for="platform in availablePlatforms"
                 :key="platform.key"
                 :type="currentPlatform === platform.key ? 'primary' : 'default'"
                 @click="switchPlatform(platform.key)"
@@ -459,6 +459,13 @@ const platforms = [
 // 当前选中的平台（用于切换显示）
 const currentPlatform = ref(1) // 默认选中小红书
 
+// 计算属性：过滤出有账号的平台
+const availablePlatforms = computed(() => {
+  return platforms.filter(platform => {
+    return allPlatformAccounts[platform.key] && allPlatformAccounts[platform.key].length > 0
+  })
+})
+
 // 所有平台的账号（按平台分组）
 const allPlatformAccounts = reactive({
   1: [], // 小红书账号
@@ -520,6 +527,14 @@ const switchPlatform = (platformKey) => {
 const removeAccountFromPlatform = (platformKey, index) => {
   allPlatformAccounts[platformKey].splice(index, 1)
   ElMessage.success('已移除账号')
+  
+  // 如果当前平台已经没有账号了，自动切换到第一个有账号的平台
+  if (allPlatformAccounts[platformKey].length === 0 && currentPlatform.value === platformKey) {
+    const firstAvailablePlatform = availablePlatforms.value[0]
+    if (firstAvailablePlatform) {
+      currentPlatform.value = firstAvailablePlatform.key
+    }
+  }
 }
 
 // 话题相关状态

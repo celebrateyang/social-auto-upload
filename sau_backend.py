@@ -229,6 +229,22 @@ async def getValidAccounts():
                             "data": rows_list
                         }),200
 
+@app.route("/getAccounts",methods=['GET'])
+def getAccounts():
+    """快速获取账号列表，不验证有效性"""
+    with sqlite3.connect(Path(BASE_DIR / "db" / "database.db")) as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+        SELECT * FROM user_info''')
+        rows = cursor.fetchall()
+        rows_list = [list(row) for row in rows]
+        print("\n📋 获取账号列表（未验证）：", len(rows_list), "个账号")
+        return jsonify({
+            "code": 200,
+            "msg": None,
+            "data": rows_list
+        }), 200
+
 @app.route('/deleteFile', methods=['GET'])
 def delete_file():
     file_id = request.args.get('id')
@@ -423,29 +439,54 @@ def postVideo():
     videos_per_day = data.get('videosPerDay')
     daily_times = data.get('dailyTimes')
     start_days = data.get('startDays')
+    
     # 打印获取到的数据（仅作为示例）
     print("File List:", file_list)
     print("Account List:", account_list)
-    match type:
-        case 1:
-            post_video_xhs(title, file_list, tags, account_list, category, enableTimer, videos_per_day, daily_times,
-                               start_days)
-        case 2:
-            post_video_tencent(title, file_list, tags, account_list, category, enableTimer, videos_per_day, daily_times,
-                               start_days)
-        case 3:
-            post_video_DouYin(title, file_list, tags, account_list, category, enableTimer, videos_per_day, daily_times,
-                      start_days, productLink, productTitle)
-        case 4:
-            post_video_ks(title, file_list, tags, account_list, category, enableTimer, videos_per_day, daily_times,
-                      start_days)
-    # 返回响应给客户端
-    return jsonify(
-        {
+    
+    # 执行上传并获取结果
+    upload_results = []
+    try:
+        match type:
+            case 1:
+                upload_results = post_video_xhs(title, file_list, tags, account_list, category, enableTimer, videos_per_day, daily_times, start_days)
+            case 2:
+                upload_results = post_video_tencent(title, file_list, tags, account_list, category, enableTimer, videos_per_day, daily_times, start_days)
+            case 3:
+                upload_results = post_video_DouYin(title, file_list, tags, account_list, category, enableTimer, videos_per_day, daily_times, start_days, productLink, productTitle)
+            case 4:
+                upload_results = post_video_ks(title, file_list, tags, account_list, category, enableTimer, videos_per_day, daily_times, start_days)
+        
+        # 统计结果
+        total = len(upload_results)
+        success = sum(1 for r in upload_results if r['status'] == 'success')
+        failed = total - success
+        
+        return jsonify({
             "code": 200,
-            "msg": None,
-            "data": None
+            "msg": f"上传完成: 成功 {success}/{total}, 失败 {failed}/{total}",
+            "data": {
+                "results": upload_results,
+                "summary": {
+                    "total": total,
+                    "success": success,
+                    "failed": failed
+                }
+            }
         }), 200
+        
+    except Exception as e:
+        print(f"上传过程发生错误: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "code": 500,
+            "msg": f"上传失败: {str(e)}",
+            "data": {
+                "results": upload_results,
+                "error": str(e)
+            }
+        }), 500
 
 
 @app.route('/updateUserinfo', methods=['POST'])

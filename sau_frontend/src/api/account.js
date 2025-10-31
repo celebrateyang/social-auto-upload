@@ -2,9 +2,14 @@ import { http } from '@/utils/request'
 
 // 账号管理相关API
 export const accountApi = {
-  // 获取有效账号列表
+  // 获取有效账号列表（会验证cookie，较慢）
   getValidAccounts() {
     return http.get('/getValidAccounts')
+  },
+  
+  // 快速获取账号列表（不验证，较快）
+  getAccounts() {
+    return http.get('/getAccounts')
   },
   
   // 添加账号

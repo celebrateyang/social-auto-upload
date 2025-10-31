@@ -7,7 +7,7 @@ from xhs import XhsClient
 
 from conf import BASE_DIR
 from utils.base_social_media import set_init_script
-from utils.log import tencent_logger, kuaishou_logger
+from utils.log import tencent_logger, kuaishou_logger, douyin_logger
 from pathlib import Path
 from uploader.xhs_uploader.main import sign_local
 
@@ -24,16 +24,16 @@ async def cookie_auth_douyin(account_file):
             await page.wait_for_url("https://creator.douyin.com/creator-micro/content/upload", timeout=5000)
             # 2024.06.17 抖音创作者中心改版
             # 判断
-            # 等待“扫码登录”元素出现，超时 5 秒（如果 5 秒没出现，说明 cookie 有效）
+            # 等待"扫码登录"元素出现，超时 5 秒（如果 5 秒没出现，说明 cookie 有效）
             try:
                 await page.get_by_text("扫码登录").wait_for(timeout=5000)
-                logger.error("[+] cookie 失效，需要扫码登录")
+                douyin_logger.error("[+] cookie 失效，需要扫码登录")
                 return False
             except:
-                logger.success("[+]  cookie 有效")
+                douyin_logger.success("[+]  cookie 有效")
                 return True
         except:
-            logger.error("[+] 等待5秒 cookie 失效")
+            douyin_logger.error("[+] 等待5秒 cookie 失效")
             await context.close()
             await browser.close()
             return False

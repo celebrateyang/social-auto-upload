@@ -12,7 +12,7 @@ from utils.log import douyin_logger
 
 async def cookie_auth(account_file):
     async with async_playwright() as playwright:
-        browser = await playwright.chromium.launch(headless=True)
+        browser = await playwright.chromium.launch(headless=True, executable_path=LOCAL_CHROME_PATH)
         context = await browser.new_context(storage_state=account_file)
         context = await set_init_script(context)
         # 创建一个新的页面
@@ -48,7 +48,8 @@ async def douyin_setup(account_file, handle=False):
 async def douyin_cookie_gen(account_file):
     async with async_playwright() as playwright:
         options = {
-            'headless': False
+            'headless': False,
+            'executable_path': LOCAL_CHROME_PATH
         }
         # Make sure to run headed.
         browser = await playwright.chromium.launch(**options)
@@ -104,7 +105,8 @@ class DouYinVideo(object):
             if self.local_executable_path:
                 browser = await playwright.chromium.launch(headless=False, executable_path=self.local_executable_path)
             else:
-                browser = await playwright.chromium.launch(headless=False)
+                # Fallback to LOCAL_CHROME_PATH if not provided
+                browser = await playwright.chromium.launch(headless=False, executable_path=LOCAL_CHROME_PATH)
             should_close_browser = True
         
         # 创建一个浏览器上下文，使用指定的 cookie 文件

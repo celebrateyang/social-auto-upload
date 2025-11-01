@@ -123,36 +123,39 @@
 
           <!-- 账号列表（按平台分组显示） -->
           <div class="account-section section-border">
-            <h3>账号列表</h3>
+            <h3>平台账号列表</h3>
             <div class="all-accounts-display">
               <template v-for="platform in [
                 { key: 1, name: '小红书' },
                 { key: 2, name: '视频号' },
                 { key: 3, name: '抖音' },
-                { key: 4, name: '快手' }
+                { key: 4, name: '快手' },
+                { key: 5, name: 'TikTok' },
+                { key: 6, name: 'Bilibili' },
+                { key: 7, name: '百家号' }
               ]" :key="platform.key">
-              <div 
-                v-if="allPlatformAccounts[platform.key] && allPlatformAccounts[platform.key].length > 0"
-                class="platform-accounts-group"
-              >
-                <div class="platform-group-header">
-                  <span class="platform-icon">{{ getPlatformIcon(platform.key) }}</span>
-                  <span class="platform-name">{{ platform.name }}账号</span>
-                  <span class="account-count">({{ allPlatformAccounts[platform.key].length }})</span>
+                <div 
+                  v-if="allPlatformAccounts[platform.key] && allPlatformAccounts[platform.key].length > 0"
+                  class="platform-accounts-group"
+                >
+                  <div class="platform-group-header">
+                    <span class="platform-icon">{{ getPlatformIcon(platform.key) }}</span>
+                    <span class="platform-name">{{ platform.name }}</span>
+                    <span class="account-count">({{ allPlatformAccounts[platform.key].length }})</span>
+                  </div>
+                  <div class="platform-accounts-list">
+                    <el-tag
+                      v-for="(account, index) in allPlatformAccounts[platform.key]"
+                      :key="account.id"
+                      closable
+                      @close="removeAccountFromPlatform(platform.key, index)"
+                      class="account-tag"
+                      :type="currentPlatform === platform.key ? 'primary' : 'info'"
+                    >
+                      {{ account.name }}
+                    </el-tag>
+                  </div>
                 </div>
-                <div class="platform-accounts-list">
-                  <el-tag
-                    v-for="(account, index) in allPlatformAccounts[platform.key]"
-                    :key="account.id"
-                    closable
-                    @close="removeAccountFromPlatform(platform.key, index)"
-                    class="account-tag"
-                    :type="currentPlatform === platform.key ? 'primary' : 'info'"
-                  >
-                    {{ account.name }}
-                  </el-tag>
-                </div>
-              </div>
               </template>
             </div>
           </div>
@@ -453,7 +456,10 @@ const platforms = [
   { key: 1, name: '小红书' },
   { key: 2, name: '视频号' },
   { key: 3, name: '抖音' },
-  { key: 4, name: '快手' }
+  { key: 4, name: '快手' },
+  { key: 5, name: 'TikTok' },
+  { key: 6, name: 'Bilibili' },
+  { key: 7, name: '百家号' }
 ]
 
 // 当前选中的平台（用于切换显示）
@@ -471,7 +477,10 @@ const allPlatformAccounts = reactive({
   1: [], // 小红书账号
   2: [], // 视频号账号
   3: [], // 抖音账号
-  4: []  // 快手账号
+  4: [], // 快手账号
+  5: [], // TikTok账号
+  6: [], // Bilibili账号
+  7: []  // 百家号账号
 })
 
 // 表单数据
@@ -501,7 +510,10 @@ const platformMap = {
   1: '小红书',
   2: '视频号',
   3: '抖音',
-  4: '快手'
+  4: '快手',
+  5: 'TikTok',
+  6: 'Bilibili',
+  7: '百家号'
 }
 
 // 当前平台名称
@@ -513,7 +525,10 @@ const getPlatformIcon = (platformKey) => {
     1: '📱', // 小红书
     2: '📺', // 视频号
     3: '🎵', // 抖音
-    4: '📹'  // 快手
+    4: '📹', // 快手
+    5: '🎬', // TikTok
+    6: '📺', // Bilibili
+    7: '📰'  // 百家号
   }
   return iconMap[platformKey]
 }
@@ -868,7 +883,10 @@ const retryUpload = async (failedResult) => {
       '抖音': 3,
       '视频号': 2,
       '小红书': 1,
-      '快手': 4
+      '快手': 4,
+      'TikTok': 5,
+      'Bilibili': 6,
+      '百家号': 7
     }
     const platformKey = platformMap[failedResult.platform]
     
@@ -1003,6 +1021,66 @@ onMounted(async () => {
       margin-bottom: 30px;
     }
     
+    // 账号列表样式 - 平台横向，账号纵向（移到这里确保生效）
+    .all-accounts-display {
+      display: flex;
+      flex-direction: row;
+      gap: 20px;
+      overflow-x: auto;
+      padding-bottom: 10px;
+      
+      .platform-accounts-group {
+        border: 1px solid #e4e7ed;
+        border-radius: 8px;
+        padding: 15px;
+        background-color: #fafafa;
+        flex-shrink: 0;
+        min-width: 150px;
+        max-width: 200px;
+        
+        .platform-group-header {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 5px;
+          margin-bottom: 15px;
+          font-weight: 500;
+          color: #303133;
+          font-size: 14px;
+          padding-bottom: 10px;
+          border-bottom: 2px solid #e4e7ed;
+          
+          .platform-icon {
+            font-size: 24px;
+          }
+          
+          .platform-name {
+            font-size: 14px;
+            font-weight: 600;
+          }
+          
+          .account-count {
+            color: #909399;
+            font-size: 12px;
+          }
+        }
+        
+        .platform-accounts-list {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          
+          .account-tag {
+            font-size: 13px;
+            padding: 8px 12px;
+            cursor: default;
+            width: 100%;
+            justify-content: space-between;
+          }
+        }
+      }
+    }
+    
     .tab-content-wrapper {
       display: flex;
       justify-content: center;
@@ -1068,54 +1146,6 @@ onMounted(async () => {
             height: 40px;
             font-size: 15px;
             font-weight: 500;
-          }
-        }
-        
-        // 账号列表样式
-        .all-accounts-display {
-          display: flex;
-          flex-direction: row;
-          gap: 15px;
-          flex-wrap: wrap;
-          
-          .platform-accounts-group {
-            border: 1px solid #e4e7ed;
-            border-radius: 8px;
-            padding: 15px;
-            background-color: #fafafa;
-            flex: 0 1 auto;
-            min-width: 200px;
-            
-            .platform-group-header {
-              display: flex;
-              align-items: center;
-              gap: 8px;
-              margin-bottom: 12px;
-              font-weight: 500;
-              color: #303133;
-              font-size: 14px;
-              
-              .platform-icon {
-                font-size: 18px;
-              }
-              
-              .account-count {
-                color: #909399;
-                font-size: 13px;
-              }
-            }
-            
-            .platform-accounts-list {
-              display: flex;
-              flex-wrap: wrap;
-              gap: 8px;
-              
-              .account-tag {
-                font-size: 13px;
-                padding: 8px 12px;
-                cursor: default;
-              }
-            }
           }
         }
         

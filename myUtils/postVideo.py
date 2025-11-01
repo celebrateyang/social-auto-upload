@@ -375,6 +375,244 @@ def post_video_xhs(title,files,tags,account_file,category=TencentZoneTypes.LIFES
     return results
 
 
+# ==================== TikTok 上传 ====================
+
+async def _upload_single_video_tiktok_async(title, file, tags, publish_datetime, cookie, account_name, playwright, browser):
+    """单个视频上传任务（TikTok）- 异步版本"""
+    from uploader.tk_uploader.main_chrome import TiktokVideo
+    
+    result = {
+        'platform': 'TikTok',
+        'account': account_name,
+        'video': file.name,
+        'status': 'success',
+        'message': '',
+        'start_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'end_time': ''
+    }
+    
+    try:
+        print(f"[TikTok] 开始上传: {account_name} - {file.name}")
+        app = TiktokVideo(title, str(file), tags, publish_datetime, str(cookie))
+        await app.main()
+        result['status'] = 'success'
+        result['message'] = '上传成功'
+        print(f"[TikTok] 上传成功: {account_name} - {file.name}")
+    except Exception as e:
+        result['status'] = 'failed'
+        result['message'] = str(e)
+        result['error_detail'] = traceback.format_exc()
+        print(f"[TikTok] 上传失败: {account_name} - {file.name} - {str(e)}")
+    finally:
+        result['end_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    
+    return result
+
+
+async def _post_video_tiktok_with_browser(tasks):
+    """批量上传TikTok视频"""
+    results = []
+    
+    for task in tasks:
+        try:
+            result = await _upload_single_video_tiktok_async(*task, None, None)
+            results.append(result)
+        except Exception as e:
+            results.append({
+                'platform': 'TikTok',
+                'account': task[5],
+                'video': task[1].name,
+                'status': 'failed',
+                'message': f'执行异常: {str(e)}',
+                'error_detail': traceback.format_exc()
+            })
+    
+    return results
+
+
+def post_video_tiktok(title, files, tags, account_file, category=None, enableTimer=False, videos_per_day=1, daily_times=None, start_days=0):
+    """
+    TikTok批量上传
+    返回: list of dict，每个dict包含上传结果
+    """
+    account_files = [Path(BASE_DIR / "cookiesFile" / file) for file in account_file]
+    files = [Path(BASE_DIR / "videoFile" / file) for file in files]
+    file_num = len(files)
+    
+    if enableTimer:
+        publish_datetimes = generate_schedule_time_next_day(file_num, videos_per_day, daily_times, start_days)
+    else:
+        publish_datetimes = [0 for i in range(file_num)]
+    
+    tasks = []
+    for cookie in account_files:
+        account_name = cookie.stem
+        for index, file in enumerate(files):
+            tasks.append((title, file, tags, publish_datetimes[index], cookie, account_name))
+    
+    results = asyncio.run(_post_video_tiktok_with_browser(tasks))
+    return results
+
+
+# ==================== Bilibili 上传 ====================
+
+def _upload_single_video_bilibili(title, file, tags, timestamp, cookie_data, tid, account_name):
+    """单个视频上传任务（Bilibili）"""
+    from uploader.bilibili_uploader.main import BilibiliUploader, random_emoji
+    
+    result = {
+        'platform': 'Bilibili',
+        'account': account_name,
+        'video': file.name,
+        'status': 'success',
+        'message': '',
+        'start_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'end_time': ''
+    }
+    
+    try:
+        print(f"[Bilibili] 开始上传: {account_name} - {file.name}")
+        # Bilibili不允许相同标题，添加随机emoji
+        unique_title = title + random_emoji()
+        desc = title  # 描述使用原始标题
+        bili_uploader = BilibiliUploader(cookie_data, file, unique_title, desc, tid, tags, timestamp)
+        bili_uploader.upload()
+        result['status'] = 'success'
+        result['message'] = '上传成功'
+        print(f"[Bilibili] 上传成功: {account_name} - {file.name}")
+    except Exception as e:
+        result['status'] = 'failed'
+        result['message'] = str(e)
+        result['error_detail'] = traceback.format_exc()
+        print(f"[Bilibili] 上传失败: {account_name} - {file.name} - {str(e)}")
+    finally:
+        result['end_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    
+    return result
+
+
+def post_video_bilibili(title, files, tags, account_file, category=None, enableTimer=False, videos_per_day=1, daily_times=None, start_days=0):
+    """
+    Bilibili批量上传
+    返回: list of dict，每个dict包含上传结果
+    """
+    from uploader.bilibili_uploader.main import read_cookie_json_file, extract_keys_from_json
+    from utils.constant import VideoZoneTypes
+    
+    account_files = [Path(BASE_DIR / "cookiesFile" / file) for file in account_file]
+    files = [Path(BASE_DIR / "videoFile" / file) for file in files]
+    file_num = len(files)
+    
+    # 设置分区，默认为知识分区（更通用，适合大多数视频）
+    tid = category if category else VideoZoneTypes.KNOWLEDGE.value
+    
+    if enableTimer:
+        timestamps = generate_schedule_time_next_day(file_num, videos_per_day, daily_times, start_days, timestamps=True)
+    else:
+        timestamps = [0 for i in range(file_num)]
+    
+    results = []
+    for cookie_file in account_files:
+        account_name = cookie_file.stem
+        try:
+            cookie_data = read_cookie_json_file(cookie_file)
+            cookie_data = extract_keys_from_json(cookie_data)
+            
+            for index, file in enumerate(files):
+                result = _upload_single_video_bilibili(title, file, tags, timestamps[index], cookie_data, tid, account_name)
+                results.append(result)
+        except Exception as e:
+            for file in files:
+                results.append({
+                    'platform': 'Bilibili',
+                    'account': account_name,
+                    'video': file.name,
+                    'status': 'failed',
+                    'message': f'Cookie读取失败: {str(e)}',
+                    'error_detail': traceback.format_exc()
+                })
+    
+    return results
+
+
+# ==================== 百家号 上传 ====================
+
+async def _upload_single_video_baijiahao_async(title, file, tags, publish_datetime, cookie, account_name):
+    """单个视频上传任务（百家号）- 异步版本"""
+    from uploader.baijiahao_uploader.main import BaiJiaHaoVideo
+    
+    result = {
+        'platform': '百家号',
+        'account': account_name,
+        'video': file.name,
+        'status': 'success',
+        'message': '',
+        'start_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'end_time': ''
+    }
+    
+    try:
+        print(f"[百家号] 开始上传: {account_name} - {file.name}")
+        app = BaiJiaHaoVideo(title, str(file), tags, publish_datetime, str(cookie))
+        await app.main()
+        result['status'] = 'success'
+        result['message'] = '上传成功'
+        print(f"[百家号] 上传成功: {account_name} - {file.name}")
+    except Exception as e:
+        result['status'] = 'failed'
+        result['message'] = str(e)
+        result['error_detail'] = traceback.format_exc()
+        print(f"[百家号] 上传失败: {account_name} - {file.name} - {str(e)}")
+    finally:
+        result['end_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    
+    return result
+
+
+async def _post_video_baijiahao_with_browser(tasks):
+    """批量上传百家号视频"""
+    results = []
+    
+    for task in tasks:
+        try:
+            result = await _upload_single_video_baijiahao_async(*task)
+            results.append(result)
+        except Exception as e:
+            results.append({
+                'platform': '百家号',
+                'account': task[5],
+                'video': task[1].name,
+                'status': 'failed',
+                'message': f'执行异常: {str(e)}',
+                'error_detail': traceback.format_exc()
+            })
+    
+    return results
+
+
+def post_video_baijiahao(title, files, tags, account_file, category=None, enableTimer=False, videos_per_day=1, daily_times=None, start_days=0):
+    """
+    百家号批量上传
+    返回: list of dict，每个dict包含上传结果
+    """
+    account_files = [Path(BASE_DIR / "cookiesFile" / file) for file in account_file]
+    files = [Path(BASE_DIR / "videoFile" / file) for file in files]
+    file_num = len(files)
+    
+    if enableTimer:
+        publish_datetimes = generate_schedule_time_next_day(file_num, videos_per_day, daily_times, start_days)
+    else:
+        publish_datetimes = [0 for i in range(file_num)]
+    
+    tasks = []
+    for cookie in account_files:
+        account_name = cookie.stem
+        for index, file in enumerate(files):
+            tasks.append((title, file, tags, publish_datetimes[index], cookie, account_name))
+    
+    results = asyncio.run(_post_video_baijiahao_with_browser(tasks))
+    return results
+
 
 # post_video("333",["demo.mp4"],"d","d")
 # post_video_DouYin("333",["demo.mp4"],"d","d")

@@ -10,8 +10,10 @@ from flask_cors import CORS
 from myUtils.auth import check_cookie
 from flask import Flask, request, jsonify, Response, render_template, send_from_directory
 from conf import BASE_DIR
-from myUtils.login import get_tencent_cookie, douyin_cookie_gen, get_ks_cookie, xiaohongshu_cookie_gen
-from myUtils.postVideo import post_video_tencent, post_video_DouYin, post_video_ks, post_video_xhs
+from myUtils.login import (get_tencent_cookie, douyin_cookie_gen, get_ks_cookie, xiaohongshu_cookie_gen,
+                            get_tiktok_cookie, get_bilibili_cookie, get_baijiahao_cookie)
+from myUtils.postVideo import (post_video_tencent, post_video_DouYin, post_video_ks, post_video_xhs,
+                                post_video_tiktok, post_video_bilibili, post_video_baijiahao)
 
 active_queues = {}
 app = Flask(__name__)
@@ -185,40 +187,32 @@ async def getValidAccounts():
         for row in rows:
             print(row)
         
-        # 逐个验证账号，失败后继续验证其他账号
-        for row in rows_list:
+        # 使用并发验证账号，提高验证速度
+        async def validate_account(row):
+            """验证单个账号"""
             try:
                 flag = await check_cookie(row[1], row[2])
-                if not flag:
-                    row[4] = 0
-                    cursor.execute('''
-                    UPDATE user_info 
-                    SET status = ? 
-                    WHERE id = ?
-                    ''', (0, row[0]))
-                    conn.commit()
-                    print(f"✅ 账号 {row[3]} 状态已更新为失效")
-                else:
-                    # 确保有效账号状态为1
-                    row[4] = 1
-                    cursor.execute('''
-                    UPDATE user_info 
-                    SET status = ? 
-                    WHERE id = ?
-                    ''', (1, row[0]))
-                    conn.commit()
-                    print(f"✅ 账号 {row[3]} 状态有效")
+                status = 1 if flag else 0
+                print(f"{'✅' if flag else '❌'} 账号 {row[3]} 验证{'成功' if flag else '失败'}")
+                return (row[0], status)
             except Exception as e:
-                # 验证失败，标记为无效，但继续验证其他账号
-                print(f"❌ 账号 {row[3]} 验证失败: {str(e)}")
-                row[4] = 0
-                cursor.execute('''
-                UPDATE user_info 
-                SET status = ? 
-                WHERE id = ?
-                ''', (0, row[0]))
-                conn.commit()
-                continue
+                print(f"❌ 账号 {row[3]} 验证异常: {str(e)}")
+                return (row[0], 0)
+        
+        # 并发验证所有账号
+        tasks = [validate_account(row) for row in rows_list]
+        results = await asyncio.gather(*tasks, return_exceptions=False)
+        
+        # 批量更新数据库状态
+        for account_id, status in results:
+            cursor.execute('''
+            UPDATE user_info 
+            SET status = ? 
+            WHERE id = ?
+            ''', (status, account_id))
+        
+        conn.commit()
+        print("✅ 所有账号验证完成，状态已更新")
         
         for row in rows:
             print(row)
@@ -456,6 +450,12 @@ def postVideo():
                 upload_results = post_video_DouYin(title, file_list, tags, account_list, category, enableTimer, videos_per_day, daily_times, start_days, productLink, productTitle)
             case 4:
                 upload_results = post_video_ks(title, file_list, tags, account_list, category, enableTimer, videos_per_day, daily_times, start_days)
+            case 5:
+                upload_results = post_video_tiktok(title, file_list, tags, account_list, category, enableTimer, videos_per_day, daily_times, start_days)
+            case 6:
+                upload_results = post_video_bilibili(title, file_list, tags, account_list, category, enableTimer, videos_per_day, daily_times, start_days)
+            case 7:
+                upload_results = post_video_baijiahao(title, file_list, tags, account_list, category, enableTimer, videos_per_day, daily_times, start_days)
         
         # 统计结果
         total = len(upload_results)
@@ -594,6 +594,21 @@ def run_async_function(type,id,status_queue):
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             loop.run_until_complete(get_ks_cookie(id,status_queue))
+            loop.close()
+        case '5':
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(get_tiktok_cookie(id, status_queue))
+            loop.close()
+        case '6':
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(get_bilibili_cookie(id, status_queue))
+            loop.close()
+        case '7':
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(get_baijiahao_cookie(id, status_queue))
             loop.close()
 
 # SSE 流生成器函数

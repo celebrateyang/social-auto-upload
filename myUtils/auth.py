@@ -99,6 +99,79 @@ async def cookie_auth_xhs(account_file):
             return True
 
 
+async def cookie_auth_tiktok(account_file):
+    """TikTok cookie验证"""
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(headless=True)
+        context = await browser.new_context(storage_state=account_file)
+        context = await set_init_script(context)
+        page = await context.new_page()
+        try:
+            await page.goto("https://www.tiktok.com/tiktokstudio/upload?lang=en")
+            await page.wait_for_load_state('networkidle', timeout=10000)
+            
+            # 检查是否需要登录
+            login_button = await page.query_selector('a[href*="login"]')
+            if login_button:
+                print("[TikTok] Cookie 失效")
+                return False
+            print("[TikTok] Cookie 有效")
+            return True
+        except Exception as e:
+            print(f"[TikTok] 验证异常: {e}")
+            return False
+        finally:
+            await context.close()
+            await browser.close()
+
+
+async def cookie_auth_bilibili(account_file):
+    """Bilibili cookie验证"""
+    try:
+        import json
+        with open(account_file, 'r', encoding='utf-8') as f:
+            cookie_data = json.load(f)
+        
+        # 检查是否有必需的cookie字段
+        if 'cookie_info' in cookie_data and 'cookies' in cookie_data['cookie_info']:
+            cookies = cookie_data['cookie_info']['cookies']
+            has_sessdata = any(c.get('name') == 'SESSDATA' for c in cookies)
+            if has_sessdata:
+                print("[Bilibili] Cookie 有效")
+                return True
+        
+        print("[Bilibili] Cookie 失效")
+        return False
+    except Exception as e:
+        print(f"[Bilibili] 验证异常: {e}")
+        return False
+
+
+async def cookie_auth_baijiahao(account_file):
+    """百家号 cookie验证"""
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(headless=True)
+        context = await browser.new_context(storage_state=account_file)
+        context = await set_init_script(context)
+        page = await context.new_page()
+        try:
+            await page.goto("https://baijiahao.baidu.com/builder/rc/home")
+            await page.wait_for_timeout(5000)
+            
+            # 检查是否出现登录提示
+            if await page.get_by_text('注册/登录百家号').count():
+                print("[百家号] Cookie 失效")
+                return False
+            print("[百家号] Cookie 有效")
+            return True
+        except Exception as e:
+            print(f"[百家号] 验证异常: {e}")
+            return False
+        finally:
+            await context.close()
+            await browser.close()
+
+
 async def check_cookie(type,file_path):
     match type:
         # 小红书
@@ -113,6 +186,15 @@ async def check_cookie(type,file_path):
         # 快手
         case 4:
             return await cookie_auth_ks(Path(BASE_DIR / "cookiesFile" / file_path))
+        # TikTok
+        case 5:
+            return await cookie_auth_tiktok(Path(BASE_DIR / "cookiesFile" / file_path))
+        # Bilibili
+        case 6:
+            return await cookie_auth_bilibili(Path(BASE_DIR / "cookiesFile" / file_path))
+        # 百家号
+        case 7:
+            return await cookie_auth_baijiahao(Path(BASE_DIR / "cookiesFile" / file_path))
         case _:
             return False
 

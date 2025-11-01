@@ -229,6 +229,7 @@
                   v-model="customTopic"
                   placeholder="输入自定义话题"
                   class="custom-input"
+                  @keyup.enter="addCustomTopic"
                 >
                   <template #prepend>#</template>
                 </el-input>
